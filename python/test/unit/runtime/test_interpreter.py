@@ -206,3 +206,28 @@ def test_dot_scaled_e8m0_boundaries(compute_type, signed_scale, rhs_scale):
     expected = np.repeat(np.array([minimum, 32.0, 64.0, np.nan], dtype=np.float32), 8)[:, None]
     expected = np.broadcast_to(expected, (32, 32))
     np.testing.assert_array_equal(result.data, expected.T if rhs_scale else expected)
+
+
+@pytest.mark.parametrize("shadow_global", [False, True])
+def test_closure_constants_are_isolated(monkeypatch, shadow_global):
+    import torch
+
+    def factory(value):
+        captured = tl.constexpr(value)
+
+        def kernel(out):
+            tl.store(out, captured)
+
+        return interpreter.InterpretedFunction(kernel)
+
+    if shadow_global:
+        monkeypatch.setitem(globals(), "captured", tl.constexpr(99))
+    output = torch.zeros((), dtype=torch.int32)
+    first, second = factory(7), factory(11)
+    for kernel, expected in [(first, 7), (second, 11), (first, 7)]:
+        kernel[(1, )](output)
+        assert output.item() == expected
+    if shadow_global:
+        assert globals()["captured"].value == 99
+    else:
+        assert "captured" not in globals()

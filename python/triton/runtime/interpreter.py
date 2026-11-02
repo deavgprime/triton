@@ -1667,6 +1667,9 @@ class FunctionRewriter:
         for key, value in globals().items():
             if key not in fn_globals:
                 fn_globals[key] = value
+        nonlocals = inspect.getclosurevars(self.fn).nonlocals
+        if nonlocals:
+            fn_globals = fn_globals | nonlocals
         exec(compiled_code, fn_globals, local_namespace)
         return local_namespace[self.fn.__name__]
 
