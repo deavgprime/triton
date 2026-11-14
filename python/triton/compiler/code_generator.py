@@ -489,6 +489,9 @@ class CodeGenerator(ast.NodeVisitor):
         # dry visit loop body
         self.scf_stack.append(node)
         with self._discovering_loop_carries():
+            # A `while` condition can rebind names, e.g. `while (i := i + 1) < n`.
+            if isinstance(node, ast.While):
+                self.visit(node.test)
             self.visit_compound_statement(node.body)
         self.scf_stack.pop()
         block.erase()
@@ -1229,9 +1232,13 @@ class CodeGenerator(ast.NodeVisitor):
                 cond = cond.condition
             if _is_triton_tensor(cond):
                 cond = cond.to(language.int1, _semantic=self.semantic)
+            # Forward the values after the condition, which may have rebound them.
+            for name in names:
+                self._verify_loop_carried_variable(name, self.lscope[name], liveins[name])
+            condition_handles = flatten_values_to_ir(self.lscope[name] for name in names)
             self.builder.set_insertion_point_to_end(before_block)
             # create ConditionOp: e.g., scf.condition(%cond) %arg0, %arg1, ...
-            self.builder.create_condition_op(cond.handle, block_args)
+            self.builder.create_condition_op(cond.handle, condition_handles)
             # merge the loop body
             after_block = self.builder.create_block_with_parent(while_op.get_after(), init_tys)
 

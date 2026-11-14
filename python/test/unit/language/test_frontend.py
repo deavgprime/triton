@@ -2163,6 +2163,25 @@ def test_loop_carry_while_shared_initial_value():
 
 @filecheck_test
 @triton.jit
+def test_while_walrus_condition_loop_carried():
+    # CHECK-LABEL: test_while_walrus_condition_loop_carried
+    i = tl.program_id(0)
+    acc = 0
+    # CHECK: scf.while (%[[I:.*]] = %{{.*}}, %[[ACC:.*]] = %{{.*}})
+    # CHECK: %[[NEXT_I:.*]] = arith.addi %[[I]],
+    # CHECK: scf.condition(%{{.*}}) %[[NEXT_I]], %[[ACC]]
+    # CHECK: } do {
+    # CHECK-NEXT: ^bb0(%[[BODY_I:.*]]: i32, %[[BODY_ACC:.*]]: i32):
+    # CHECK: %[[NEXT_ACC:.*]] = arith.addi %[[BODY_ACC]], %[[BODY_I]]
+    # CHECK: scf.yield %[[BODY_I]], %[[NEXT_ACC]]
+    while (i := i + 1) < 10:
+        acc += i
+    anchor(i)
+    anchor(acc)
+
+
+@filecheck_test
+@triton.jit
 def test_loop_carry_tuple_shared_initial_value():
     # CHECK-LABEL: test_loop_carry_tuple_shared_initial_value
     # CHECK: %[[SEED:.*]] = arith.constant 1 : i32
