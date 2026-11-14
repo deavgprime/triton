@@ -389,6 +389,8 @@ def serialize_specialization_data(name, signature, constants, attrs, options, ke
             return {"jit_function": f"{value.module}:{value.fn.__qualname__}"}
         if isinstance(value, type):
             return {"class": f"{value.__module__}:{value.__qualname__}"}
+        if isinstance(value, tuple):
+            return [_encode_constant(v) for v in value]
         return value
 
     constants = {key: _encode_constant(value) for key, value in constants.items()}
@@ -882,7 +884,9 @@ class JITFunction(JITCallable, KernelInterface[T]):
                     if not isinstance(cls, type):
                         raise RuntimeError(f"Expected class {class_key} for preload, got {type(cls).__name__}")
                     return cls
-            return convert_to_tuple_if_list(value)
+            if isinstance(value, list):
+                return tuple(_decode_constant(v) for v in value)
+            return value
 
         constexprs = {key: _decode_constant(value) for key, value in zip(constant_keys, constant_vals)}
         attrs_keys = map(tuple, deserialized_obj['attrs_keys'])

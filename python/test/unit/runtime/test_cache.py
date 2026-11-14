@@ -842,6 +842,13 @@ def test_preload_dtype_constant(monkeypatch):
     assert _preload_constants(specialization_data, monkeypatch)[(0, )] == tl.float32
 
 
+@pytest.mark.parametrize("constant", [(tl.float16, tl.bfloat16), (_preload_function, _preload_gluon_function),
+                                      ((tl.float32, (1, _preload_function)), 2)])
+def test_preload_tuple_constants(constant, monkeypatch):
+    specialization_data = _serialize_constants({(0, ): constant})
+    assert _preload_constants(specialization_data, monkeypatch)[(0, )] == constant
+
+
 def test_preload_registered_local_function(monkeypatch):
 
     @triton.jit
