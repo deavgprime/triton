@@ -688,6 +688,8 @@ class CodeGenerator(ast.NodeVisitor):
             self.set_value(arg_name, arg_value)
         insert_pt = self.builder.get_insertion_block()
         self.builder.set_insertion_point_to_start(entry)
+        if self.is_kernel:
+            self._materialize_specialized_int_args(arg_names, arg_values)
         # visit function body
         self.visit_compound_statement(node.body)
 
@@ -696,6 +698,15 @@ class CodeGenerator(ast.NodeVisitor):
 
         if insert_pt:
             self.builder.set_insertion_point_to_end(insert_pt)
+
+    def _materialize_specialized_int_args(self, arg_names, arg_values):
+        # The launcher specializes int arguments equal to 1 to constexprs. Rebind
+        # them as constants of their runtime type, so integer division, modulo,
+        # overflow and type promotion behave as they do for other values.
+        for name, value in zip(arg_names, arg_values):
+            param = next(p for p in self.jit_fn.params if p.name == name)
+            if not param.is_constexpr and _is_constexpr(value) and type(value.value) is int:
+                self.set_value(name, self.semantic.to_tensor(value.value))
 
     def visit_arguments(self, node):
         arg_names = []

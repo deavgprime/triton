@@ -2161,6 +2161,24 @@ def test_loop_carry_while_shared_initial_value():
     anchor(b)
 
 
+@triton.jit
+def specialized_int_arg_arithmetic(n):
+    # CHECK-LABEL: specialized_int_arg_arithmetic
+    # CHECK: %[[N:.*]] = arith.constant 1 : i32
+    # CHECK: %[[SUB0:.*]] = arith.subi %[[N]],
+    # CHECK: arith.divsi %[[SUB0]],
+    # CHECK: %[[SUB1:.*]] = arith.subi %[[N]],
+    # CHECK: arith.remsi %[[SUB1]],
+    anchor((n - 4) // 2)
+    anchor((n - 4) % 2)
+
+
+def test_specialized_int_arg_keeps_runtime_type():
+    # The launcher specializes an int argument equal to 1 to a constant; the
+    # kernel must still use integer (not Python) division and modulo for it.
+    run_filecheck_test(specialized_int_arg_arithmetic, args=(1, ))
+
+
 @filecheck_test
 @triton.jit
 def test_loop_carry_tuple_shared_initial_value():
