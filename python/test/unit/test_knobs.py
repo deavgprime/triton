@@ -317,7 +317,7 @@ def test_amd_codegen_revision_invalidates_backend_hash(fresh_knobs, monkeypatch)
     first_hash = backend.hash()
 
     monkeypatch.setattr(compiler, "get_amd_codegen_revision", lambda: "second-revision-1")
-    backend.hash.cache_clear()
+    backend._codegen_hash.cache_clear()
     second_hash = backend.hash()
 
     assert first_hash != second_hash
@@ -542,6 +542,23 @@ def test_nvidia_lsr_concurrent():
         results = list(executor.map(concurrent_emit, policies))
     assert results == [expected[policy] for policy in policies]
     assert emit((False, False)) == expected[False, False]
+
+
+def test_amd_buffer_ops_knobs_change_backend_hash(monkeypatch):
+    from triton.backends.compiler import GPUTarget
+    from triton.compiler import make_backend
+
+    backend = make_backend(GPUTarget("hip", "gfx942", 64))
+    monkeypatch.setattr(triton.knobs.amd, "use_buffer_ops", True)
+    monkeypatch.delenv("AMDGCN_ANALYZE_SMALL_TENSOR_RANGE", raising=False)
+    default = backend.hash()
+
+    monkeypatch.setattr(triton.knobs.amd, "use_buffer_ops", False)
+    assert backend.hash() != default
+
+    monkeypatch.setattr(triton.knobs.amd, "use_buffer_ops", True)
+    monkeypatch.setenv("AMDGCN_ANALYZE_SMALL_TENSOR_RANGE", "1")
+    assert backend.hash() != default
 
 
 def test_knobs_scope(fresh_knobs, monkeypatch):

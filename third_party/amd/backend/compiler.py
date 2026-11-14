@@ -953,5 +953,11 @@ class HIPBackend(BaseBackend):
             knobs.runtime.add_stages_inspection_hook(self, stages, options, language, None)
 
     @functools.lru_cache()
-    def hash(self):
+    def _codegen_hash(self):
         return f'{self.target}-{get_amd_codegen_revision()}'
+
+    def hash(self):
+        # These knobs change the generated code but are not cache-invalidating env
+        # vars, and use_buffer_ops can be set from Python without touching the env.
+        buffer_ops = (knobs.amd.use_buffer_ops, knobs.amd.buffer_ops_analyze_small_tensor_range)
+        return f'{self._codegen_hash()}-{buffer_ops}'
